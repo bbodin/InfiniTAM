@@ -458,7 +458,9 @@ IF(DEFINED libuvc_LIBRARIES)
 ENDIF()
 IF(WITH_REALSENSE)
   TARGET_LINK_LIBRARIES(${appname}-original   ${RealSense_LIBRARY})
+
 ENDIF()
-    
+      TARGET_LINK_LIBRARIES(${appname}-original   pthread)
     
 add_slambench_binary(${appname}  benchmark    original "" "-D_GLIBCXX_USE_CXX11_ABI=1" "")
+add_slambench_binary(${appname}  main         original "" "-D_GLIBCXX_USE_CXX11_ABI=1" "")
