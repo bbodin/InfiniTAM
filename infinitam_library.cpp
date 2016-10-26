@@ -37,20 +37,6 @@ void sb_new_slam_configuration(SLAMBenchConfiguration ** slam_settings) {
 
 bool sb_init_slam_system(SLAMBenchConfiguration * slam_settings)  {
 
-    uint32_t mxcsr;
-      uint32_t mask = 0;
-      mask |= 0 << 12;   // precision mask
-      mask |= 0 << 11;   // under flow mask
-      mask |= 0 << 10;   // over flow mask
-      mask |= 1 << 9;    // division by zero mask
-      mask |= 0 << 7;    // invalid operator mask
-      mask = ~mask;
-      asm volatile ("stmxcsr %0" : "=m"(mxcsr));
-      mxcsr &= mask;
-      asm volatile ("ldmxcsr %0" : : "m"(mxcsr));
-
-
-
     config = dynamic_cast<ITAMConfiguration*> (slam_settings);
 
     // Teddy RGB camera settings :
