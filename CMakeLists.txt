@@ -1,39 +1,18 @@
 cmake_minimum_required(VERSION 2.8)
 
-macro(CANONIFY_BOOL var)
-  if (${var})
-    set(${var} TRUE)
-  else()
-    set(${var} FALSE)
-  endif()
-endmacro()
 
 find_package(GLUT REQUIRED)
 find_package(OpenGL REQUIRED)
 
 find_package(CUDA QUIET)
-CANONIFY_BOOL(CUDA_FOUND)
-message(STATUS "CUDA found: " ${CUDA_FOUND})
-
 find_package(OpenNI QUIET)
-CANONIFY_BOOL(OPENNI_FOUND)
-message(STATUS "OpenNI found: " ${OPENNI_FOUND})
-
 find_package(libuvc QUIET)
-CANONIFY_BOOL(libuvc_FOUND)
-message(STATUS "libuvc found: ${libuvc_FOUND}")
-
 find_package(RealSense QUIET)
-CANONIFY_BOOL(REALSENSE_FOUND)
-message(STATUS "librealsense found: ${REALSENSE_FOUND}")
-
 find_package(PNG QUIET)
-CANONIFY_BOOL(PNG_FOUND)
-message(STATUS "libpng found: ${PNG_FOUND}")
 
-OPTION(WITH_CUDA "Build with CUDA support?" ${CUDA_FOUND})
-
+OPTION(WITH_CUDA "Build with CUDA support?" OFF)
 OPTION(WITH_OPENMP "Enable OpenMP support?" OFF)
+
 IF(WITH_OPENMP)
   FIND_PACKAGE(OpenMP)
   IF(OPENMP_FOUND)
@@ -64,6 +43,14 @@ IF("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -stdlib=libstdc++")
 ENDIF()
 
+
+
+#############################
+# Source files              #
+#############################
+
+##
+
 SET(ORUTILS_HEADERS
 InfiniTAM/ORUtils/Vector.h
 InfiniTAM/ORUtils/Matrix.h
@@ -85,11 +72,7 @@ ${ORUTILS_HEADERS}
 SOURCE_GROUP("" FILES ${ORUTILS_HEADERS})
 add_library(ORUtils ${ORUTILS_OBJECTS})
 
-#############################
-# Specify the project files #
-#############################
 
-##
 SET(ITMLIB_TOPLEVEL_HEADERS
 InfiniTAM/ITMLib/ITMLib.h
 )
@@ -426,41 +409,11 @@ target_link_libraries(InfiniTAM Utils)
 include_directories("InfiniTAM/ITMLib/Engine")
 
     add_library(${appname}-original  
-InfiniTAM/Engine/ImageSourceEngine.cpp
-InfiniTAM/Engine/ImageSourceEngine.h
-InfiniTAM/Engine/IMUSourceEngine.cpp
-InfiniTAM/Engine/IMUSourceEngine.h
-InfiniTAM/Engine/Kinect2Engine.cpp
-InfiniTAM/Engine/Kinect2Engine.h
-InfiniTAM/Engine/OpenNIEngine.cpp
-InfiniTAM/Engine/OpenNIEngine.h
-InfiniTAM/Engine/LibUVCEngine.cpp
-InfiniTAM/Engine/LibUVCEngine.h
-InfiniTAM/Engine/UIEngine.cpp
-InfiniTAM/Engine/UIEngine.h
-InfiniTAM/Engine/CLIEngine.cpp
-InfiniTAM/Engine/CLIEngine.h
-InfiniTAM/Engine/RealSenseEngine.cpp
-InfiniTAM/Engine/RealSenseEngine.h
+        infinitam_library.cpp
     )
-    
-target_link_libraries(${appname}-original   ${GLUT_LIBRARIES})
-target_link_libraries(${appname}-original   ${OPENGL_LIBRARIES})
-target_link_libraries(${appname}-original   ITMLib)
-IF(WITH_CUDA)
-  target_link_libraries(${appname}-original   ${CUDA_LIBRARY})
-ENDIF()
-IF(OPENNI_FOUND)
-  target_link_libraries(${appname}-original   ${OpenNI_LIBRARY})
-ENDIF(OPENNI_FOUND)
-IF(DEFINED libuvc_LIBRARIES)
-  target_link_libraries(${appname}-original   ${libuvc_LIBRARIES})
-ENDIF()
-IF(WITH_REALSENSE)
-  TARGET_LINK_LIBRARIES(${appname}-original   ${RealSense_LIBRARY})
+    target_link_libraries(${appname}-original  Engine Utils )
 
-ENDIF()
-      TARGET_LINK_LIBRARIES(${appname}-original   pthread)
+
     
 add_slambench_binary(${appname}  benchmark    original "" "-D_GLIBCXX_USE_CXX11_ABI=1" "")
-add_slambench_binary(${appname}  main         original "" "-D_GLIBCXX_USE_CXX11_ABI=1" "")
+add_slambench_binary(${appname}  gui-glut     original "" "-D_GLIBCXX_USE_CXX11_ABI=1" "${GLUT_LIBRARIES};${OPENGL_LIBRARIES};pthread")
