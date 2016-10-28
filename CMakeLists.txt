@@ -10,7 +10,7 @@ find_package(libuvc QUIET)
 find_package(RealSense QUIET)
 find_package(PNG QUIET)
 
-OPTION(WITH_CUDA "Build with CUDA support?" OFF)
+OPTION(WITH_CUDA "Build with CUDA support?" CUDA_FOUND)
 OPTION(WITH_OPENMP "Enable OpenMP support?" OFF)
 
 IF(WITH_OPENMP)
