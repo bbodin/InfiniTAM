@@ -113,6 +113,35 @@ bool sb_init_slam_system(SLAMBenchConfiguration * slam_settings)  {
 
     internalSettings = new ITMLibSettings();
 
+    internalSettings->useBilateralFilter = config->useBilateralFilter;
+    internalSettings->useApproximateRaycast = config->useApproximateRaycast;
+    internalSettings->modelSensorNoise = config->modelSensorNoise;
+    internalSettings->trackerType = config->trackerType;
+    internalSettings->noICPRunTillLevel = config->noICPRunTillLevel;
+    internalSettings->skipPoints = config->skipPoints;
+
+    internalSettings->depthTrackerICPThreshold = config->depthTrackerICPThreshold;
+    internalSettings->depthTrackerTerminationThreshold = config->depthTrackerTerminationThreshold;
+    internalSettings->useSwapping = config->useSwapping;
+
+    internalSettings->noHierarchyLevels = config->trackingRegime.size();
+    delete internalSettings->trackingRegime;
+    internalSettings->trackingRegime = new TrackerIterationType[internalSettings->noHierarchyLevels];
+    for (int i = 0 ; i < internalSettings->noHierarchyLevels ; i++) {
+        internalSettings->trackingRegime[i] = config->trackingRegime[i];
+    }
+
+
+    internalSettings->sceneParams.voxelSize = config->voxelSize;
+    internalSettings->sceneParams.viewFrustum_min = config->viewFrustum_min;
+    internalSettings->sceneParams.viewFrustum_max = config->viewFrustum_max;
+    internalSettings->sceneParams.mu = config->mu;
+    internalSettings->sceneParams.maxW = config->maxW;
+    internalSettings->sceneParams.stopIntegratingAtMaxW = config->stopIntegratingAtMaxW;
+
+
+
+
     inputSize[0] = rgb_frame->getSize()[0] ;
     inputSize[1] = rgb_frame->getSize()[1] ;
 
@@ -210,10 +239,10 @@ bool sb_clean_slam_system() {
  * Process frames.
  */
 
-bool sb_update_frame (void * data, Sensor* s)  {
+bool sb_update_frame (Sensor* s)  {
     switch (s->get_format()) {
-    case DEPTH_FRAME : memcpy ( inputDepth,  data , inputSize.x * inputSize.y * sizeof (uint16_t)); return true;
-    case RGB_FRAME   : memcpy ( inputRGB  ,  data , inputSize.x * inputSize.y * sizeof (sb_uchar3)); return true;
+    case DEPTH_FRAME : dynamic_cast<DepthFrame*>(s)->getDepthFrame(inputDepth); return true;
+    case RGB_FRAME   : dynamic_cast<RGBFrame*>(s)->getRGBFrame((sb_uchar3*)inputRGB);  return true;
        default : return false;
     };
 }
