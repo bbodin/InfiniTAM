@@ -30,7 +30,7 @@ IF(MSVC_IDE)
   add_definitions(-DUSING_CMAKE=1)
 ELSE(MSVC_IDE)
   set(CFLAGS_WARN "-Wall -Wextra -Wno-unused-parameter -Wno-strict-aliasing")
-  set(CMAKE_CXX_FLAGS "-fPIC -O3 -march=native ${CFLAGS_WARN}")
+  set(CMAKE_CXX_FLAGS "-fPIC -O3 -march=native -std=c++11 ${CFLAGS_WARN}")
   #set(CMAKE_CXX_FLAGS "-fPIC -g ${CFLAGS_WARN} ${CMAKE_CXX_FLAGS}")
 ENDIF(MSVC_IDE)
 
