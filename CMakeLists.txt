@@ -415,5 +415,6 @@ include_directories("InfiniTAM/ITMLib/Engine")
 
 
     
+add_slambench_library(${appname}  library_wrapper    original "" "-D_GLIBCXX_USE_CXX11_ABI=1" "")
 add_slambench_binary(${appname}  benchmark    original "" "-D_GLIBCXX_USE_CXX11_ABI=1" "")
 add_slambench_binary(${appname}  gui-glut     original "" "-D_GLIBCXX_USE_CXX11_ABI=1" "${GLUT_LIBRARIES};${OPENGL_LIBRARIES};pthread")
