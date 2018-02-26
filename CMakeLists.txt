@@ -1,7 +1,10 @@
 cmake_minimum_required(VERSION 2.8)
 
 
-find_package(GLUT REQUIRED)
+#################################################################################################
+# Find packages                                                                                 #
+#################################################################################################
+
 find_package(OpenGL REQUIRED)
 
 find_package(CUDA QUIET)
@@ -9,45 +12,26 @@ find_package(OpenNI QUIET)
 find_package(libuvc QUIET)
 find_package(RealSense QUIET)
 find_package(PNG QUIET)
-
-OPTION(WITH_CUDA "Build with CUDA support?" CUDA_FOUND)
-OPTION(WITH_OPENMP "Enable OpenMP support?" OFF)
-
-IF(WITH_OPENMP)
-  FIND_PACKAGE(OpenMP)
-  IF(OPENMP_FOUND)
-    SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
-    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
-  ENDIF()
-  ADD_DEFINITIONS(-DWITH_OPENMP)
-ENDIF()
-
-
-OPTION(WITH_REALSENSE "Build with Intel RealSense support?" ${REALSENSE_FOUND})
-
-IF(MSVC_IDE)
-  add_definitions(-D_CRT_SECURE_NO_WARNINGS)
-  add_definitions(-DUSING_CMAKE=1)
-ELSE(MSVC_IDE)
-  set(CFLAGS_WARN "-Wall -Wextra -Wno-unused-parameter -Wno-strict-aliasing")
-  set(CMAKE_CXX_FLAGS "-fPIC -O3 -march=native -std=c++11 ${CFLAGS_WARN}")
-  #set(CMAKE_CXX_FLAGS "-fPIC -g ${CFLAGS_WARN} ${CMAKE_CXX_FLAGS}")
-ENDIF(MSVC_IDE)
-
-if(APPLE)
-  set(CUDA_HOST_COMPILER /usr/bin/clang)
-endif(APPLE)
-
-IF("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libstdc++ -Wno-deprecated-declarations -Wno-unused-function")
-  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -stdlib=libstdc++")
-ENDIF()
+FIND_PACKAGE(OpenMP QUIET)
 
 
 
-#############################
-# Source files              #
-#############################
+find_package(SuiteSparse REQUIRED)
+find_package(Pangolin)
+find_package(Eigen3   REQUIRED)
+
+include_directories(
+  ${CHOLMOD_INCLUDE_DIR} #Has been set by SuiteParse
+)
+
+include_directories(${EIGEN3_INCLUDE_DIR})
+
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-error=deprecated-declarations ") # Eigen raises deprecated declarations warning.
+
+
+#################################################################################################
+# Source files                                                                                  #
+#################################################################################################
 
 ##
 
@@ -228,6 +212,32 @@ InfiniTAM/ITMLib/Utils/ITMLibSettings.h
 InfiniTAM/ITMLib/Utils/ITMMath.h
 )
 
+
+SET(ENGINE_SOURCES
+InfiniTAM/Engine/ImageSourceEngine.cpp
+InfiniTAM/Engine/ImageSourceEngine.h
+InfiniTAM/Engine/IMUSourceEngine.cpp
+InfiniTAM/Engine/IMUSourceEngine.h
+InfiniTAM/Engine/Kinect2Engine.cpp
+InfiniTAM/Engine/Kinect2Engine.h
+InfiniTAM/Engine/OpenNIEngine.cpp
+InfiniTAM/Engine/OpenNIEngine.h
+InfiniTAM/Engine/LibUVCEngine.cpp
+InfiniTAM/Engine/LibUVCEngine.h
+InfiniTAM/Engine/UIEngine.cpp
+InfiniTAM/Engine/UIEngine.h
+InfiniTAM/Engine/CLIEngine.cpp
+InfiniTAM/Engine/CLIEngine.h
+InfiniTAM/Engine/RealSenseEngine.cpp
+InfiniTAM/Engine/RealSenseEngine.h
+)
+
+
+SET(UTILS_SOURCES
+InfiniTAM/Utils/FileUtils.cpp
+InfiniTAM/Utils/FileUtils.h
+InfiniTAM/Utils/NVTimer.h
+)
 #################################################################
 # Collect the project files into common, CPU-only and CUDA-only #
 #################################################################
@@ -265,156 +275,221 @@ SOURCE_GROUP(Engine\\DeviceSpecific\\CUDA FILES ${ITMLIB_ENGINE_DEVICESPECIFIC_C
 SOURCE_GROUP(Objects FILES ${ITMLIB_OBJECTS_SOURCES} ${ITMLIB_OBJECTS_HEADERS})
 SOURCE_GROUP(Utils FILES ${ITMLIB_UTILS_SOURCES} ${ITMLIB_UTILS_HEADERS})
 
-##############################################################
-# Specify the include directories, target and link libraries #
-##############################################################
-
-if(WITH_CUDA)
-  if(NOT DEFINED CUDA_COMPUTE_CAPABILITY)
-    include(${PROJECT_SOURCE_DIR}/cmake/CUDACheckCompute.cmake)
-  endif()
-  message(STATUS "CUDA_COMPUTE_CAPABILITY = ${CUDA_COMPUTE_CAPABILITY}")
-  set(CUDA_ARCH ${CUDA_COMPUTE_CAPABILITY} CACHE STRING "CUDA architectures to compile for")
-  message(STATUS "CUDA_ARCH = ${CUDA_ARCH}")
-  string(REPLACE " " ";" CUDA_ARCH_LIST "${CUDA_ARCH}")
-  message(STATUS "CUDA_ARCH_LIST = ${CUDA_ARCH_LIST}")
-  foreach(a ${CUDA_ARCH_LIST})
-    set(CUDA_ARCH_OPTIONS "${CUDA_ARCH_OPTIONS} -gencode arch=compute_${a},code=compute_${a}")
-  endforeach()
-  include_directories(${CUDA_INCLUDE_DIRS})
-  cuda_add_library(ITMLib
-	${ITMLIB_CPU_OBJECTS}
-	${ITMLIB_CUDA_OBJECTS}
-	${ITMLIB_COMMON_OBJECTS}
-	OPTIONS "${CUDA_ARCH_OPTIONS} --use_fast_math")
-  target_link_libraries(ITMLib ${CUDA_LIBRARY})
-else()
-  add_definitions(-DCOMPILE_WITHOUT_CUDA)
-  add_library(ITMLib ${ITMLIB_CPU_OBJECTS} ${ITMLIB_COMMON_OBJECTS})
-endif()
-
-target_link_libraries(ITMLib Utils)
 
 
-IF(WITH_CUDA)
-  include_directories(${CUDA_INCLUDE_DIRS})
-ELSE()
-  add_definitions(-DCOMPILE_WITHOUT_CUDA)
-ENDIF()
 
-IF(PNG_FOUND)
-  include_directories(${PNG_INCLUDE_DIRS})
-  add_definitions(${PNG_DEFINITIONS})
-  add_definitions(-DUSE_LIBPNG)
-ENDIF()
+#################################################################################################
+# Prepare compilation parameters                                                                #
+#################################################################################################
 
-add_library(Utils
-InfiniTAM/Utils/FileUtils.cpp
-InfiniTAM/Utils/FileUtils.h
-InfiniTAM/Utils/NVTimer.h
-)
 
-IF(PNG_FOUND)
-  target_link_libraries(Utils ${PNG_LIBRARIES})
-ENDIF()
+#############################
+# Generics                  #
+#############################
 
+add_definitions(-DCOMPILE_WITHOUT_OpenNI)
+add_definitions(-DCOMPILE_WITHOUT_Kinect2)
 
 
 include_directories(${OPENGL_INCLUDE_DIR})
 include_directories(${GLUT_INCLUDE_DIR})
 
-IF(WITH_CUDA)
-  include_directories(${CUDA_INCLUDE_DIRS})
-ELSE()
-  add_definitions(-DCOMPILE_WITHOUT_CUDA)
-ENDIF()
 
-IF(OPENNI_FOUND)
-  include_directories(${OpenNI_INCLUDE_DIR})
-ELSE(OPENNI_FOUND)
-  add_definitions(-DCOMPILE_WITHOUT_OpenNI)
-ENDIF(OPENNI_FOUND)
+IF(MSVC_IDE)
+  add_definitions(-D_CRT_SECURE_NO_WARNINGS)
+  add_definitions(-DUSING_CMAKE=1)
+ELSE(MSVC_IDE)
+  set(CFLAGS_WARN "-Wall -Wextra -Wno-unused-parameter -Wno-strict-aliasing")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC -g -O3 -march=native -std=c++11 ${CFLAGS_WARN}")
+ENDIF(MSVC_IDE)
 
-IF(MSKINECTAPI_FOUND)
-  include_directories(${MSKINECTAPI_INCLUDE_DIR})
-ELSE(MSKINECTAPI_FOUND)
-  add_definitions(-DCOMPILE_WITHOUT_Kinect2)
-ENDIF(MSKINECTAPI_FOUND)
+if(APPLE)
+  set(CUDA_HOST_COMPILER /usr/bin/clang)
+endif(APPLE)
 
-IF(DEFINED libuvc_INCLUDE_DIRS)
-  include_directories(${libuvc_INCLUDE_DIRS})
-  add_definitions(-DCOMPILE_WITH_LibUVC)
-ENDIF()
-
-IF(WITH_REALSENSE)
-  include_directories(${RealSense_INCLUDE_DIR})
-  add_definitions(-DCOMPILE_WITH_RealSense)
-  SET_PROPERTY(SOURCE InfiniTAM/Engine/RealSenseEngine.cpp PROPERTY COMPILE_FLAGS -std=c++11)
-ENDIF()
-
-add_library(Engine
-InfiniTAM/Engine/ImageSourceEngine.cpp
-InfiniTAM/Engine/ImageSourceEngine.h
-InfiniTAM/Engine/IMUSourceEngine.cpp
-InfiniTAM/Engine/IMUSourceEngine.h
-InfiniTAM/Engine/Kinect2Engine.cpp
-InfiniTAM/Engine/Kinect2Engine.h
-InfiniTAM/Engine/OpenNIEngine.cpp
-InfiniTAM/Engine/OpenNIEngine.h
-InfiniTAM/Engine/LibUVCEngine.cpp
-InfiniTAM/Engine/LibUVCEngine.h
-InfiniTAM/Engine/UIEngine.cpp
-InfiniTAM/Engine/UIEngine.h
-InfiniTAM/Engine/CLIEngine.cpp
-InfiniTAM/Engine/CLIEngine.h
-InfiniTAM/Engine/RealSenseEngine.cpp
-InfiniTAM/Engine/RealSenseEngine.h
-)
-
-target_link_libraries(Engine ${GLUT_LIBRARIES})
-target_link_libraries(Engine ${OPENGL_LIBRARIES})
-target_link_libraries(Engine ITMLib)
-IF(WITH_CUDA)
-  target_link_libraries(Engine ${CUDA_LIBRARY})
-ENDIF()
-IF(OPENNI_FOUND)
-  target_link_libraries(Engine ${OpenNI_LIBRARY})
-ENDIF(OPENNI_FOUND)
-IF(DEFINED libuvc_LIBRARIES)
-  target_link_libraries(Engine ${libuvc_LIBRARIES})
-ENDIF()
-IF(WITH_REALSENSE)
-  TARGET_LINK_LIBRARIES(Engine ${RealSense_LIBRARY})
+IF("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libstdc++ -Wno-deprecated-declarations -Wno-unused-function")
+  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -stdlib=libstdc++")
 ENDIF()
 
 
+#############################
+# ITMLibCUDA               #
+#############################
 
 
-IF(WITH_CUDA)
-  include_directories(${CUDA_INCLUDE_DIRS})
-ELSE()
-  add_definitions(-DCOMPILE_WITHOUT_CUDA)
+
+
+IF (CUDA_FOUND)
+
+	STRING(REPLACE "_static.a" ".so" CUDA_LIBRARIES "${CUDA_LIBRARIES}")
+
+  	SET( CUDA_PROPAGATE_HOST_FLAGS OFF ) 
+
+	add_library(UtilsCUDA ${UTILS_SOURCES})
+
+	IF(PNG_FOUND)
+		target_compile_definitions(UtilsCUDA PRIVATE  ${PNG_DEFINITIONS})
+		target_compile_definitions(UtilsCUDA PRIVATE  "-DUSE_LIBPNG")
+		target_include_directories(UtilsCUDA  PRIVATE ${PNG_INCLUDE_DIRS})
+		target_link_libraries(UtilsCUDA ${PNG_LIBRARIES})
+	ENDIF()
+	
+	
+
+	message(STATUS "LOAD FILE = ${CMAKE_SOURCE_DIR}/cmake_modules/CUDACheckCompute.cmake")
+	
+	if(NOT DEFINED CUDA_COMPUTE_CAPABILITY)
+	  include(${CMAKE_SOURCE_DIR}/cmake_modules/CUDACheckCompute.cmake)
+	endif()
+	message(STATUS "CUDA_COMPUTE_CAPABILITY = ${CUDA_COMPUTE_CAPABILITY}")
+	set(CUDA_ARCH ${CUDA_COMPUTE_CAPABILITY} CACHE STRING "CUDA architectures to compile for")
+	message(STATUS "CUDA_ARCH = ${CUDA_ARCH}")
+	string(REPLACE " " ";" CUDA_ARCH_LIST "${CUDA_ARCH}")
+	message(STATUS "CUDA_ARCH_LIST = ${CUDA_ARCH_LIST}")
+	foreach(a ${CUDA_ARCH_LIST})
+	  set(CUDA_ARCH_OPTIONS "${CUDA_ARCH_OPTIONS} -gencode arch=compute_${a},code=compute_${a}")
+	endforeach()
+	
+	
+	
+	cuda_add_library(ITMLibCUDA
+	${ITMLIB_CPU_OBJECTS}
+	${ITMLIB_CUDA_OBJECTS}
+	${ITMLIB_COMMON_OBJECTS}
+	OPTIONS "${CUDA_ARCH_OPTIONS} -O3 -std=c++11 -Xcompiler -fPIC --use_fast_math")
+	#target_link_libraries(ITMLibCUDA ${CUDA_LIBRARY})
+	
+	target_include_directories(ITMLibCUDA  PRIVATE ${CUDA_INCLUDE_DIRS})
+
+	add_library(EngineCUDA SHARED  ${ENGINE_SOURCES})
+	
+	target_link_libraries(EngineCUDA ${GLUT_LIBRARIES})
+	target_link_libraries(EngineCUDA ${OPENGL_LIBRARIES})
+	target_link_libraries(EngineCUDA ITMLibCUDA)
+	target_link_libraries(EngineCUDA ${CUDA_LIBRARY})
+	
+	
+
+
 ENDIF()
 
-add_executable(InfiniTAM_cli InfiniTAM/InfiniTAM_cli.cpp)
-target_link_libraries(InfiniTAM_cli Engine)
-target_link_libraries(InfiniTAM_cli Utils)
-
-add_executable(InfiniTAM InfiniTAM/InfiniTAM.cpp)
-target_link_libraries(InfiniTAM Engine)
-target_link_libraries(InfiniTAM Utils)
+#############################################
+# UtilsCPP, ITMLibCPP and EngineCPP   
+#############################################
 
 
+add_library(UtilsCPP ${UTILS_SOURCES})
 
-include_directories("InfiniTAM/ITMLib/Engine")
-
-    add_library(${appname}-original  
-        infinitam_library.cpp
-    )
-    target_link_libraries(${appname}-original  Engine Utils )
+target_compile_definitions(UtilsCPP PUBLIC  "-DCOMPILE_WITHOUT_OPENMP")
+target_compile_definitions(UtilsCPP PUBLIC  "-DCOMPILE_WITHOUT_CUDA")
 
 
+IF(PNG_FOUND)
+	target_compile_definitions(UtilsCPP PRIVATE  ${PNG_DEFINITIONS})
+	target_compile_definitions(UtilsCPP PRIVATE  "-DUSE_LIBPNG")
+	target_include_directories(UtilsCPP  PRIVATE ${PNG_INCLUDE_DIRS})
+	target_link_libraries(UtilsCPP ${PNG_LIBRARIES})
+ENDIF()
+
+
+
+add_library(ITMLibCPP ${ITMLIB_CPU_OBJECTS} ${ITMLIB_COMMON_OBJECTS})
+target_link_libraries(ITMLibCPP UtilsCPP)
+
+target_compile_definitions(ITMLibCPP PUBLIC  "-DCOMPILE_WITHOUT_OPENMP")
+target_compile_definitions(ITMLibCPP PUBLIC  "-DCOMPILE_WITHOUT_CUDA")
+
+add_library(EngineCPP ${ENGINE_SOURCES})
+
+target_link_libraries(EngineCPP ${GLUT_LIBRARIES})
+target_link_libraries(EngineCPP ${OPENGL_LIBRARIES})
+target_link_libraries(EngineCPP ITMLibCPP)
+
+target_compile_definitions(EngineCPP PUBLIC  "-DCOMPILE_WITHOUT_OPENMP")
+target_compile_definitions(EngineCPP PUBLIC  "-DCOMPILE_WITHOUT_CUDA")
+
+
+
+#############################################
+# UtilsOMP, ITMLibOMP and EngineOMP   
+#############################################
+
+
+
+add_library(UtilsOMP ${UTILS_SOURCES})
+SET_TARGET_PROPERTIES(UtilsOMP PROPERTIES COMPILE_FLAGS ${OpenMP_CXX_FLAGS})
+target_compile_definitions(UtilsOMP PUBLIC  "-DCOMPILE_WITHOUT_CUDA")
+target_compile_definitions(UtilsOMP PUBLIC  "-DWITH_OPENMP")
+
+
+IF(PNG_FOUND)
+	target_compile_definitions(UtilsOMP PRIVATE  ${PNG_DEFINITIONS})
+	target_compile_definitions(UtilsOMP PRIVATE  "-DUSE_LIBPNG")
+	target_include_directories(UtilsOMP  PRIVATE ${PNG_INCLUDE_DIRS})
+	target_link_libraries(UtilsOMP ${PNG_LIBRARIES})
+ENDIF()
+
+
+
+add_library(ITMLibOMP ${ITMLIB_CPU_OBJECTS} ${ITMLIB_COMMON_OBJECTS})
+SET_TARGET_PROPERTIES(ITMLibOMP PROPERTIES COMPILE_FLAGS ${OpenMP_CXX_FLAGS})
+target_link_libraries(ITMLibOMP UtilsOMP)
+
+target_compile_definitions(ITMLibOMP PUBLIC  "-DCOMPILE_WITHOUT_CUDA")
+target_compile_definitions(ITMLibOMP PUBLIC  "-DWITH_OPENMP")
+
+add_library(EngineOMP ${ENGINE_SOURCES})
+SET_TARGET_PROPERTIES(EngineOMP PROPERTIES COMPILE_FLAGS ${OpenMP_CXX_FLAGS})
+
+target_link_libraries(EngineOMP ${GLUT_LIBRARIES})
+target_link_libraries(EngineOMP ${OPENGL_LIBRARIES})
+target_link_libraries(EngineOMP ITMLibOMP)
+
+target_compile_definitions(EngineOMP PUBLIC  "-DCOMPILE_WITHOUT_CUDA")
+target_compile_definitions(EngineOMP PUBLIC  "-DWITH_OPENMP")
+
+
+
+
+
+
+#################################################################################################
+# SLAMbench Libraries                                                                           #
+#################################################################################################
+
+### CPP
+#########
+
+add_library(${appname}-cpp infinitam_library.cpp)
+target_link_libraries(${appname}-cpp  EngineCPP )
+target_include_directories(${appname}-cpp  PRIVATE "InfiniTAM/ITMLib/Engine")
+target_include_directories(${appname}-cpp  PRIVATE "InfiniTAM/ORUtils")
+
+generate_slam_library(${appname}-cpp "")
+
+### OMP
+#########
+
+add_library(${appname}-omp infinitam_library.cpp)
+target_link_libraries(${appname}-omp  EngineOMP )
+target_include_directories(${appname}-omp  PRIVATE "InfiniTAM/ITMLib/Engine")
+target_include_directories(${appname}-omp  PRIVATE "InfiniTAM/ORUtils")
+
+generate_slam_library(${appname}-omp "${OpenMP_CXX_FLAGS}")
+
+
+IF (CUDA_FOUND)
+
+### CUDA
+#########
+
+add_library(${appname}-cuda infinitam_library.cpp)
+target_link_libraries(${appname}-cuda  EngineCUDA )
+target_include_directories(${appname}-cuda  PRIVATE "InfiniTAM/ITMLib/Engine")
+target_include_directories(${appname}-cuda  PRIVATE "InfiniTAM/ORUtils")
+
+generate_slam_library(${appname}-cuda "")
+
+ENDIF()
     
-add_slambench_library(${appname}  library_wrapper    original "" "-D_GLIBCXX_USE_CXX11_ABI=1" "")
-add_slambench_binary(${appname}  benchmark    original "" "-D_GLIBCXX_USE_CXX11_ABI=1" "")
-add_slambench_binary(${appname}  gui-glut     original "" "-D_GLIBCXX_USE_CXX11_ABI=1" "${GLUT_LIBRARIES};${OPENGL_LIBRARIES};pthread")
