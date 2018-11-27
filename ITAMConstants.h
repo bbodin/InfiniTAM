@@ -39,7 +39,7 @@ template<> inline void  TypedParameter<ITMLibSettings::TrackerType >::setValue(c
     }
 
 }
-template<> inline const std::string  TypedParameter< ITMLibSettings::TrackerType >::getValue(const void * ptr) {
+template<> inline const std::string  TypedParameter< ITMLibSettings::TrackerType >::getValue(const void * ptr) const {
 
     switch (*((ITMLibSettings::TrackerType*)ptr)) {
     //! Identifies a tracker based on colour image
@@ -98,7 +98,7 @@ template<> inline void  TypedParameter< typename std::vector<TrackerIterationTyp
 
 };
 
-template<> inline const std::string  TypedParameter< typename std::vector<TrackerIterationType> >::getValue(const void * ptr) {
+template<> inline const std::string  TypedParameter< typename std::vector<TrackerIterationType> >::getValue(const void * ptr) const {
 
     std::stringstream ss;
     bool first = true;
